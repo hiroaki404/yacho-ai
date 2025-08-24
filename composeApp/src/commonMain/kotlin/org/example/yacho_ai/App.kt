@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -96,7 +98,9 @@ fun App(chatAgent: ChatAgent) {
                             coroutineScope.launch {
                                 if (chat.isEmpty()) {
                                     try {
-                                        chatAgent.runAgent(message)
+                                        chatAgent.runAgent(message) {
+                                            isLoading = false
+                                        }
                                     } catch (e: ApiKeyNotConfiguredException) {
                                         // エラー処理は後で実装
                                     } finally {
@@ -128,36 +132,99 @@ fun App(chatAgent: ChatAgent) {
 
 @Composable
 fun MessageBubble(message: ChatMessage) {
-    val isUser = message is ChatMessage.User
+    when (message) {
+        is ChatMessage.User -> UserMessageBubble(message)
+        is ChatMessage.Assistant -> AssistantMessageBubble(message)
+        is ChatMessage.ToolCall -> ToolCallMessageBubble(message)
+    }
+}
 
+@Composable
+fun UserMessageBubble(message: ChatMessage.User) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+        horizontalArrangement = Arrangement.End
     ) {
         Card(
             modifier = Modifier.widthIn(max = 280.dp),
             shape = RoundedCornerShape(
                 topStart = 16.dp,
                 topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp
+                bottomStart = 16.dp,
+                bottomEnd = 4.dp
             ),
             colors = CardDefaults.cardColors(
-                containerColor = if (isUser)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.surfaceVariant
+                containerColor = MaterialTheme.colorScheme.primary
             )
         ) {
             Text(
                 text = message.content,
                 modifier = Modifier.padding(12.dp),
-                color = if (isUser)
-                    MaterialTheme.colorScheme.onPrimary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimary,
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+    }
+}
+
+@Composable
+fun AssistantMessageBubble(message: ChatMessage.Assistant) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Card(
+            modifier = Modifier.widthIn(max = 280.dp),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = 4.dp,
+                bottomEnd = 16.dp
+            ),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Text(
+                text = message.content,
+                modifier = Modifier.padding(12.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+fun ToolCallMessageBubble(message: ChatMessage.ToolCall) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Card(
+            modifier = Modifier.widthIn(max = 280.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Build,
+                    contentDescription = "Tool",
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = message.content,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }

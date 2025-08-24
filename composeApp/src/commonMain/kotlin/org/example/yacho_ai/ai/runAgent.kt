@@ -17,6 +17,7 @@ sealed interface ChatMessage {
 
     data class User(override val content: String) : ChatMessage
     data class Assistant(override val content: String) : ChatMessage
+    data class ToolCall(override val content: String) : ChatMessage
 }
 
 
@@ -30,7 +31,7 @@ object ChatAgent {
         askToUseInUITool.setUserInput(input)
     }
 
-    suspend fun runAgent(input: String): String {
+    suspend fun runAgent(input: String, onTakeAssistantMessage: () -> Unit): String {
         _chat.value += ChatMessage.User(input)
 
         val apiKeyProvider = createApiKeyProvider()
@@ -57,8 +58,10 @@ object ChatAgent {
                     println("after node " + it.node.name + it.output)
                 }
                 onToolCall {
+                    _chat.value += ChatMessage.ToolCall("Used tool: ${it.tool.name}")
                     val tool = it.tool
                     if (tool is AskUserInUI) {
+                        onTakeAssistantMessage()
                         val message = (it.toolArgs as AskUserInUI.Args).message
                         _chat.value += ChatMessage.Assistant(message)
                     }
