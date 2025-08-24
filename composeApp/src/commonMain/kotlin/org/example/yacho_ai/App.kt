@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.example.yacho_ai.ai.ApiKeyNotConfiguredException
 import org.example.yacho_ai.ai.runAgent
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -55,7 +56,7 @@ fun App() {
                             coroutineScope.launch {
                                 try {
                                     aiResponse = runAgent(userInput)
-                                } catch (e: Exception) {
+                                } catch (e: ApiKeyNotConfiguredException) {
                                     aiResponse = "エラーが発生しました: ${e.message}"
                                 } finally {
                                     isLoading = false
@@ -98,7 +99,7 @@ fun AIResponseCard(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
-    
+
     Card(
         modifier = modifier,
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -114,7 +115,7 @@ fun AIResponseCard(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            
+
             if (isLoading) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
