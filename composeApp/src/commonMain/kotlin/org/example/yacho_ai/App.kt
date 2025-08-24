@@ -20,8 +20,7 @@ import org.example.yacho_ai.ai.ChatMessage
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
-@Preview
-fun App(chatAgent: ChatAgent) {
+fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier.safeContentPadding()) {
     val chat by chatAgent.chat.collectAsState()
 
     MaterialTheme {
@@ -30,7 +29,7 @@ fun App(chatAgent: ChatAgent) {
         val coroutineScope = rememberCoroutineScope()
         val listState = rememberLazyListState()
 
-        // 新しいメッセージが追加されたときに自動スクロール
+        // Auto-scroll when new messages are added
         LaunchedEffect(chat.size) {
             if (chat.isNotEmpty()) {
                 listState.animateScrollToItem(chat.size - 1)
@@ -38,21 +37,13 @@ fun App(chatAgent: ChatAgent) {
         }
 
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .background(MaterialTheme.colorScheme.background)
-                .safeContentPadding()
                 .fillMaxSize()
         ) {
-            // ヘッダー
-            Text(
-                text = "Yacho AI Chat",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(16.dp)
-            )
+            AppHeader()
 
-            // チャット履歴
+            // Chat history
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -65,7 +56,6 @@ fun App(chatAgent: ChatAgent) {
                     MessageBubble(message = message)
                 }
 
-                // ローディング中のインジケーター
                 if (isLoading) {
                     item {
                         LoadingMessageBubble()
@@ -73,7 +63,7 @@ fun App(chatAgent: ChatAgent) {
                 }
             }
 
-            // 入力フィールド
+            // Input field
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -84,7 +74,7 @@ fun App(chatAgent: ChatAgent) {
                 OutlinedTextField(
                     value = userInput,
                     onValueChange = { userInput = it },
-                    label = { Text("メッセージを入力") },
+                    label = { Text("Enter message") },
                     modifier = Modifier.weight(1f),
                     enabled = !isLoading
                 )
@@ -102,7 +92,7 @@ fun App(chatAgent: ChatAgent) {
                                             isLoading = false
                                         }
                                     } catch (e: ApiKeyNotConfiguredException) {
-                                        // エラー処理は後で実装
+                                        // Error handling will be implemented later
                                     } finally {
                                         isLoading = false
                                     }
@@ -122,7 +112,7 @@ fun App(chatAgent: ChatAgent) {
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("送信")
+                        Text("Send")
                     }
                 }
             }
@@ -230,6 +220,31 @@ fun ToolCallMessageBubble(message: ChatMessage.ToolCall) {
 }
 
 @Composable
+fun AppHeader() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth().padding(16.dp)
+    ) {
+        Text(
+            text = "Yacho AI",
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Text(
+            text = "Japanese bird identification app",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        Text(
+            text = "Please enter information about the bird you saw",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+@Composable
 fun LoadingMessageBubble() {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -257,11 +272,19 @@ fun LoadingMessageBubble() {
                     strokeWidth = 2.dp
                 )
                 Text(
-                    text = "AIが返答を生成中...",
+                    text = "AI is generating response...",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
+    }
+}
+
+@Preview
+@Composable
+fun AppPreview() {
+    MaterialTheme {
+        App(chatAgent = ChatAgent, modifier = Modifier)
     }
 }
