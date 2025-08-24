@@ -39,12 +39,13 @@ fun App() {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
                     value = userInput,
                     onValueChange = { userInput = it },
-                    label = { Text("メッセージを入力") },
+                    label = { Text("Enter message") },
                     modifier = Modifier.weight(1f),
                     enabled = !isLoading
                 )
@@ -54,10 +55,10 @@ fun App() {
                         if (userInput.isNotBlank()) {
                             isLoading = true
                             coroutineScope.launch {
-                                try {
-                                    aiResponse = runAgent(userInput)
+                                aiResponse = try {
+                                    runAgent(userInput)
                                 } catch (e: ApiKeyNotConfiguredException) {
-                                    aiResponse = "エラーが発生しました: ${e.message}"
+                                    "Error occurred: ${e.message}"
                                 } finally {
                                     isLoading = false
                                 }
@@ -74,7 +75,7 @@ fun App() {
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("送信")
+                        Text("Send")
                     }
                 }
             }
@@ -111,7 +112,7 @@ fun AIResponseCard(
                 .verticalScroll(scrollState)
         ) {
             Text(
-                text = "AI 応答:",
+                text = "AI Response:",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -125,7 +126,7 @@ fun AIResponseCard(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp
                     )
-                    Text("AI が応答を生成中...")
+                    Text("AI is generating response...")
                 }
             } else {
                 Text(
