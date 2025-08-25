@@ -2,7 +2,6 @@ package org.example.yacho_ai.ai
 
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.ext.agent.chatAgentStrategy
 import ai.koog.agents.features.eventHandler.feature.handleEvents
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.executor.llms.all.simpleOpenAIExecutor
@@ -49,13 +48,13 @@ object ChatAgent {
         val agent = AIAgent(
             executor = executor,
             llmModel = OpenAIModels.Reasoning.GPT4oMini,
-            strategy = chatAgentStrategy(),
+            strategy = yachoAgentStrategy(),
             toolRegistry = toolRegistry,
         ) {
             handleEvents {
                 onAfterNode {
                     // Debug
-                    println("after node " + it.node.name + it.output)
+                    println("after node  ${it.node.name} : ${it.output}")
                 }
                 onToolCall {
                     _chat.value += ChatMessage.ToolCall("Used tool: ${it.tool.name}")
@@ -67,6 +66,7 @@ object ChatAgent {
                     }
                 }
                 onAgentFinished {
+                    _chat.value += ChatMessage.Assistant("${it.result}")
                     // Debug
                     println("Agent finished")
                 }
