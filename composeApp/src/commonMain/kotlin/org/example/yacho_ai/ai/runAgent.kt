@@ -26,6 +26,8 @@ object ChatAgent {
     private val _chat: MutableStateFlow<List<ChatMessage>> = MutableStateFlow(emptyList())
     val chat: StateFlow<List<ChatMessage>> = _chat
     val askToUseInUITool = AskUserInUI
+    val apiKeyProvider = createApiKeyProvider()
+    val apiKey = apiKeyProvider.getGoogleApiKey()
 
     fun inputResponse(input: String) {
         _chat.value += ChatMessage.User(input)
@@ -35,9 +37,6 @@ object ChatAgent {
     suspend fun runAgent(input: String, onTakeAssistantMessage: () -> Unit): String {
         _chat.value += ChatMessage.User(input)
 
-        val apiKeyProvider = createApiKeyProvider()
-        val apiKey = apiKeyProvider.getGoogleApiKey()
-
         if (apiKey.isEmpty()) {
             throw ApiKeyNotConfiguredException("Google API Key is not configured. Please add GOOGLE_API_KEY to local.properties")
         }
@@ -46,18 +45,14 @@ object ChatAgent {
             tool(askToUseInUITool)
         }
 
-        val executor = simpleOpenAIExecutor(apiKey)
         val agent = AIAgent(
-            executor = executor,
-            llmModel = OpenAIModels.Reasoning.GPT4oMini,
+            executor = simpleOpenAIExecutor(apiKey),
+            llmModel = OpenAIModels.Chat.GPT4_1,
             strategy = yachoAgentStrategy(),
             toolRegistry = toolRegistry,
         ) {
             handleEvents {
                 onAfterNode {
-                    // Debug
-                    println("🌲after node  ${it.node.name} : ${it.output}")
-                    println("--------------------------------")
                     if (it.node.name == "nodeCallLLMWithStructuredResult") {
                         val result = (it.output as Result<*>)
                         if (result.isSuccess) {
@@ -67,6 +62,10 @@ object ChatAgent {
                             _chat.value += ChatMessage.Assistant(jsonStringResult)
                         }
                     }
+
+                    // Debug
+                    println("🌲after node  ${it.node.name} : ${it.output}")
+                    println("--------------------------------")
                 }
                 onAfterLLMCall {
                     // Debug
@@ -87,11 +86,14 @@ object ChatAgent {
                     val tool = it.tool
                     if (tool is AskUserInUI) {
                         onTakeAssistantMessage()
+                        _chat.value += ChatMessage.Assistant((it.toolArgs as AskUserInUI.Args).message)
+                        // TODO: display tool call message
                     }
-                    // TODO: display tool call message
                 }
                 onAgentFinished {
                     _chat.value += ChatMessage.Assistant("${it.result}")
+                    _chat.value += ChatMessage.Assistant("Identified a wild bird. Chat finished")
+
                     // Debug
                     println("🎥Agent finished")
                 }

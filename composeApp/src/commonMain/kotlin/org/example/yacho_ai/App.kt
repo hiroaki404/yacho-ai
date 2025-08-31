@@ -20,7 +20,7 @@ import org.example.yacho_ai.ai.ChatMessage
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
-fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier.safeContentPadding()) {
+fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier) {
     val chat by chatAgent.chat.collectAsState()
 
     MaterialTheme {
