@@ -8,17 +8,23 @@ import ai.koog.prompt.executor.llms.all.simpleOpenAIExecutor
 import ai.koog.prompt.structure.StructuredResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.serialization.json.Json
 import org.example.yacho_ai.config.createApiKeyProvider
 
 class ApiKeyNotConfiguredException(message: String) : IllegalArgumentException(message)
 
-sealed interface ChatMessage {
+sealed interface TextMessage {
     val content: String
+}
 
-    data class User(override val content: String) : ChatMessage
-    data class Assistant(override val content: String) : ChatMessage
-    data class ToolCall(override val content: String) : ChatMessage
+sealed interface StructuredMessage {
+    val content: SpecifyYachoResult
+}
+
+sealed interface ChatMessage {
+    data class User(override val content: String) : ChatMessage, TextMessage
+    data class Assistant(override val content: String) : ChatMessage, TextMessage
+    data class ToolCall(override val content: String) : ChatMessage, TextMessage
+    data class Structured(override val content: SpecifyYachoResult) : ChatMessage, StructuredMessage
 }
 
 
@@ -58,8 +64,7 @@ object ChatAgent {
                         if (result.isSuccess) {
                             val structuredResponse = result.getOrThrow() as StructuredResponse<*>
                             val specifyYachoResult = structuredResponse.structure as SpecifyYachoResult
-                            val jsonStringResult = Json { prettyPrint = true }.encodeToString(specifyYachoResult)
-                            _chat.value += ChatMessage.Assistant(jsonStringResult)
+                            _chat.value += ChatMessage.Structured(specifyYachoResult)
                         }
                     }
 
