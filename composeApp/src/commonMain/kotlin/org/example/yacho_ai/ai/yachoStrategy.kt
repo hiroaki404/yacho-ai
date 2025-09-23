@@ -9,9 +9,8 @@ import ai.koog.agents.core.environment.result
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.structure.StructureFixingParser
 import ai.koog.prompt.structure.StructuredResponse
-import ai.koog.prompt.structure.json.JsonSchemaGenerator
-import ai.koog.prompt.structure.json.JsonStructuredData
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -57,28 +56,27 @@ fun yachoAgentStrategy(): AIAgentStrategy<String, String> = strategy("yacho-chat
         }
 
         val nodeCallLLMWithStructuredResult by nodeLLMRequestStructured<SpecifyYachoResult>(
-            structure = JsonStructuredData.createJsonStructure<SpecifyYachoResult>(
-                schemaFormat = JsonSchemaGenerator.SchemaFormat.JsonSchema,
-                examples = listOf(
-                    SpecifyYachoResult(
-                        reliabilityScore = 35,
-                        birdName = "スズメ (Passer montanus)",
-                        description = "全長約14cm。頭部は茶褐色で黒い過眼線があり、頬に黒い斑点が特徴的。背中は茶褐色で黒い縦斑、腹部は灰白色。都市部から農村部まで幅広く生息し、群れで行動することが多い。"
-                    ),
-                    SpecifyYachoResult(
-                        reliabilityScore = 48,
-                        birdName = "ヒヨドリ (Hypsipetes amaurotis)",
-                        description = "全長約28cm。全体的に灰褐色で、頭部がやや黒っぽく、頬から耳羽にかけて褐色。尾は長めで先端が白い。鳴き声が特徴的で「ヒーヨ、ヒーヨ」と聞こえる。公園や住宅地でよく見られる。"
-                    ),
-                    SpecifyYachoResult(
-                        reliabilityScore = 72,
-                        birdName = "メジロ (Zosterops japonicus)",
-                        description = "全長約12cm。背中は黄緑色、腹部は白色で脇腹に黄色味がある。目の周りの白いアイリングが最大の特徴。花の蜜や果実を好み、梅や桜の花によく訪れる。小さな群れで行動することが多い。"
-                    )
+            examples = listOf(
+                SpecifyYachoResult(
+                    reliabilityScore = 35,
+                    birdName = "スズメ (Passer montanus)",
+                    description = "全長約14cm。頭部は茶褐色で黒い過眼線があり、頬に黒い斑点が特徴的。背中は茶褐色で黒い縦斑、腹部は灰白色。都市部から農村部まで幅広く生息し、群れで行動することが多い。"
+                ),
+                SpecifyYachoResult(
+                    reliabilityScore = 48,
+                    birdName = "ヒヨドリ (Hypsipetes amaurotis)",
+                    description = "全長約28cm。全体的に灰褐色で、頭部がやや黒っぽく、頬から耳羽にかけて褐色。尾は長めで先端が白い。鳴き声が特徴的で「ヒーヨ、ヒーヨ」と聞こえる。公園や住宅地でよく見られる。"
+                ),
+                SpecifyYachoResult(
+                    reliabilityScore = 72,
+                    birdName = "メジロ (Zosterops japonicus)",
+                    description = "全長約12cm。背中は黄緑色、腹部は白色で脇腹に黄色味がある。目の周りの白いアイリングが最大の特徴。花の蜜や果実を好み、梅や桜の花によく訪れる。小さな群れで行動することが多い。"
                 )
             ),
-            retries = 2,
-            fixingModel = OpenAIModels.CostOptimized.GPT4oMini
+            fixingParser = StructureFixingParser(
+                fixingModel = OpenAIModels.CostOptimized.GPT4oMini,
+                retries = 2,
+            )
         )
 
         val specifyBird by node<Result<StructuredResponse<SpecifyYachoResult>>, String> {
