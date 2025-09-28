@@ -38,6 +38,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.koog.agents)
+            implementation(libs.coil.compose)
+            implementation(libs.coil.core)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

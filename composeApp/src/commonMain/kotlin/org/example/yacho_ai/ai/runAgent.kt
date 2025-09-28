@@ -1,11 +1,15 @@
 package org.example.yacho_ai.ai
 
 import ai.koog.agents.core.agent.AIAgent
+import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.features.eventHandler.feature.handleEvents
+import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.executor.llms.all.simpleOpenAIExecutor
+import ai.koog.prompt.params.LLMParams
 import ai.koog.prompt.structure.StructuredResponse
+import kotlin.reflect.typeOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.example.yacho_ai.config.createApiKeyProvider
@@ -20,8 +24,35 @@ sealed interface StructuredMessage {
     val content: SpecifyYachoResult
 }
 
+sealed interface ImageInput {
+    val image: ByteArray
+}
+
 sealed interface ChatMessage {
     data class User(override val content: String) : ChatMessage, TextMessage
+    data class UserImage(
+        override val image: ByteArray,
+        override val content: String
+    ) : ChatMessage, ImageInput, TextMessage {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as UserImage
+
+            if (!image.contentEquals(other.image)) return false
+            if (content != other.content) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = image.contentHashCode()
+            result = 31 * result + content.hashCode()
+            return result
+        }
+    }
+
     data class Assistant(override val content: String) : ChatMessage, TextMessage
     data class ToolCall(override val content: String) : ChatMessage, TextMessage
     data class Structured(override val content: SpecifyYachoResult) : ChatMessage, StructuredMessage
@@ -52,9 +83,23 @@ object ChatAgent {
         }
 
         val agent = AIAgent(
-            executor = simpleOpenAIExecutor(apiKey),
-            llmModel = OpenAIModels.Chat.GPT4_1,
+            inputType = typeOf<MultiModalInput>(),
+            outputType = typeOf<String>(),
+            promptExecutor = simpleOpenAIExecutor(apiKey),
             strategy = yachoAgentStrategy(),
+            agentConfig = AIAgentConfig(
+                prompt = prompt(
+                    id = "chat",
+                    params = LLMParams(
+                        temperature = 1.0,
+                        numberOfChoices = 1
+                    )
+                ) {
+                    system("")
+                },
+                model = OpenAIModels.Chat.GPT4_1,
+                maxAgentIterations = 50,
+            ),
             toolRegistry = toolRegistry,
         ) {
             handleEvents {
@@ -105,6 +150,6 @@ object ChatAgent {
             }
         }
 
-        return agent.run(input)
+        return agent.run(MultiModalInput(input))
     }
 }

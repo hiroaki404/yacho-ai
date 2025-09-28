@@ -24,11 +24,31 @@ data class SpecifyYachoResult(
     val description: String,
 )
 
-fun yachoAgentStrategy(): AIAgentStrategy<String, String> = strategy("yacho-chat") {
-    val userMessages = mutableListOf<String>()
+data class MultiModalInput(val text: String, val image: ByteArray? = null) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as MultiModalInput
+
+        if (text != other.text) return false
+        if (!image.contentEquals(other.image)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = text.hashCode()
+        result = 31 * result + (image?.contentHashCode() ?: 0)
+        return result
+    }
+}
+
+fun yachoAgentStrategy(): AIAgentStrategy<MultiModalInput, String> = strategy("yacho-chat") {
+    val userMessages = mutableListOf<MultiModalInput>()
     var toolCallCount = 0
 
-    val nodeUpdatePrompt by node<String, String>("nodeUpdatePrompt") { message ->
+    val nodeUpdatePrompt by node<MultiModalInput, MultiModalInput>("nodeUpdatePrompt") { multiModalInput ->
         llm.writeSession {
             updatePrompt {
                 system(
@@ -36,11 +56,11 @@ fun yachoAgentStrategy(): AIAgentStrategy<String, String> = strategy("yacho-chat
                 )
             }
         }
-        message
+        multiModalInput
     }
 
-    val evaluateBird by subgraph<String, Message.Response> {
-        val buildListingBirdPrompt by node<String, String> { userMessage ->
+    val evaluateBird by subgraph<MultiModalInput, Message.Response> {
+        val buildListingBirdPrompt by node<MultiModalInput, String> { userMessage ->
             userMessages.add(userMessage)
             "${userMessages.joinToString("\n")}\n---\nBased on the above input and conversation history, please list about 3 possible wild bird candidates"
             // TODO: Context is forgotten, so conversation history gets lost. Should keep it as memory
@@ -48,7 +68,7 @@ fun yachoAgentStrategy(): AIAgentStrategy<String, String> = strategy("yacho-chat
 
         val listingBirdCandidates by nodeLLMRequest(allowToolCalls = false)
 
-        val buildStructedBirdPrompt by node<Message.Response, String> { listingResponse ->
+        val buildStructuredBirdPrompt by node<Message.Response, String> { listingResponse ->
             """
                 "${listingResponse.content}"
                 Based on the conversation history, please select one top candidate and provide an explanation about it.
@@ -85,7 +105,7 @@ fun yachoAgentStrategy(): AIAgentStrategy<String, String> = strategy("yacho-chat
 
         val callLLM by nodeLLMRequest(allowToolCalls = false)
 
-        nodeStart then buildListingBirdPrompt then listingBirdCandidates then buildStructedBirdPrompt then nodeCallLLMWithStructuredResult then specifyBird then callLLM then nodeFinish
+        nodeStart then buildListingBirdPrompt then listingBirdCandidates then buildStructuredBirdPrompt then nodeCallLLMWithStructuredResult then specifyBird then callLLM then nodeFinish
     }
 
     val nodeExecuteTool by nodeExecuteTool("nodeExecuteTool")
@@ -130,5 +150,5 @@ fun yachoAgentStrategy(): AIAgentStrategy<String, String> = strategy("yacho-chat
 
     edge(nodeExecuteTool forwardTo nodeSendToolResult)
 
-    edge(nodeSendToolResult forwardTo evaluateBird)
+    edge(nodeSendToolResult forwardTo evaluateBird transformed { MultiModalInput(it) })
 }

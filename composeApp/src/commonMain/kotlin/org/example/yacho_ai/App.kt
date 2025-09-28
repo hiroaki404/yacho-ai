@@ -7,12 +7,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import org.example.yacho_ai.ai.ApiKeyNotConfiguredException
 import org.example.yacho_ai.ai.ChatAgent
@@ -26,6 +31,7 @@ fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier) {
     MaterialTheme {
         var userInput by remember { mutableStateOf("") }
         var isLoading by remember { mutableStateOf(false) }
+        var selectedImage by remember { mutableStateOf<ByteArray?>(null) }
         val coroutineScope = rememberCoroutineScope()
         val listState = rememberLazyListState()
 
@@ -63,56 +69,132 @@ fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier) {
                 }
             }
 
-            // Input field
-            Row(
+            // Input field with image preview
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
-                    value = userInput,
-                    onValueChange = { userInput = it },
-                    label = { Text("Enter message") },
-                    modifier = Modifier.weight(1f),
-                    enabled = !isLoading
-                )
+                // Image preview
+                selectedImage?.let { imageBytes ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            AsyncImage(
+                                model = imageBytes,
+                                contentDescription = "Selected image preview",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 120.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Fit
+                            )
 
-                Button(
-                    onClick = {
-                        if (userInput.isNotBlank()) {
-                            val message = userInput
-                            userInput = ""
-                            isLoading = true
-                            coroutineScope.launch {
-                                if (chat.isEmpty()) {
-                                    try {
-                                        chatAgent.runAgent(message) {
-                                            isLoading = false
-                                        }
-                                    } catch (e: ApiKeyNotConfiguredException) {
-                                        // Error handling will be implemented later
-                                    } finally {
-                                        isLoading = false
-                                    }
-                                } else {
-                                    chatAgent.inputResponse(message)
-                                }
+                            // Remove image button
+                            IconButton(
+                                onClick = { selectedImage = null },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove image",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
-                    },
-                    enabled = !isLoading && userInput.isNotBlank(),
-                    modifier = Modifier.height(56.dp)
+                    }
+                }
+
+                // Input row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
+                    // Image selection button
+                    IconButton(
+                        onClick = {
+                            // TODO: Implement image picker
+                            // For now, we'll create a dummy image for demonstration
+                            selectedImage = ByteArray(1024) { it.toByte() }
+                        },
+                        enabled = !isLoading,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add image",
+                            tint = MaterialTheme.colorScheme.primary
                         )
-                    } else {
-                        Text("Send")
+                    }
+
+                    OutlinedTextField(
+                        value = userInput,
+                        onValueChange = { userInput = it },
+                        label = { Text("Enter message") },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isLoading
+                    )
+
+                    Button(
+                        onClick = {
+                            if (userInput.isNotBlank() || selectedImage != null) {
+                                val message = userInput
+                                val image = selectedImage
+                                userInput = ""
+                                selectedImage = null
+                                isLoading = true
+                                coroutineScope.launch {
+                                    if (chat.isEmpty()) {
+                                        try {
+                                            if (image != null) {
+                                                // TODO: Send image message
+                                                // chatAgent.sendImageMessage(message, image)
+                                            } else {
+                                                chatAgent.runAgent(message) {
+                                                    isLoading = false
+                                                }
+                                            }
+                                        } catch (e: ApiKeyNotConfiguredException) {
+                                            // Error handling will be implemented later
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    } else {
+                                        if (image != null) {
+                                            // TODO: Send image message
+                                            // chatAgent.sendImageMessage(message, image)
+                                        } else {
+                                            chatAgent.inputResponse(message)
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isLoading && (userInput.isNotBlank() || selectedImage != null),
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Text("Send")
+                        }
                     }
                 }
             }
@@ -124,6 +206,7 @@ fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier) {
 fun MessageBubble(message: ChatMessage) {
     when (message) {
         is ChatMessage.User -> UserMessageBubble(message)
+        is ChatMessage.UserImage -> UserImageMessageBubble(message)
         is ChatMessage.Assistant -> AssistantMessageBubble(message)
         is ChatMessage.ToolCall -> ToolCallMessageBubble(message)
         is ChatMessage.Structured -> StructuredMessageBubble(message)
@@ -242,6 +325,54 @@ fun AppHeader() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp)
         )
+    }
+}
+
+@Composable
+fun UserImageMessageBubble(message: ChatMessage.UserImage) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
+    ) {
+        Card(
+            modifier = Modifier.widthIn(max = 280.dp),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 4.dp
+            ),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AsyncImage(
+                    model = message.image,
+                    contentDescription = "User uploaded image",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Fit,
+                )
+
+                // エラー時のフォールバック表示
+                // 実際の実装では、画像の読み込み状態を監視して条件付きで表示
+
+                // Text content if provided
+                if (message.content.isNotBlank()) {
+                    Text(
+                        text = message.content,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
     }
 }
 
