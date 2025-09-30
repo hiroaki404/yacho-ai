@@ -124,12 +124,12 @@ fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Image selection button
+                    val imagePickerLauncher = rememberImagePickerLauncher { imageBytes ->
+                        selectedImage = imageBytes
+                    }
+
                     IconButton(
-                        onClick = {
-                            // TODO: Implement image picker
-                            // For now, we'll create a dummy image for demonstration
-                            selectedImage = ByteArray(1024) { it.toByte() }
-                        },
+                        onClick = { imagePickerLauncher() },
                         enabled = !isLoading,
                         modifier = Modifier.size(48.dp)
                     ) {
