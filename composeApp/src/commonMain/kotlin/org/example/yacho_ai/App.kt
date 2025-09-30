@@ -3,6 +3,7 @@ package org.example.yacho_ai
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,26 +23,24 @@ import kotlinx.coroutines.launch
 import org.example.yacho_ai.ai.ApiKeyNotConfiguredException
 import org.example.yacho_ai.ai.ChatAgent
 import org.example.yacho_ai.ai.ChatMessage
+import org.example.yacho_ai.ui.LoadingMessageBubble
+import org.example.yacho_ai.ui.MessageBubble
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier) {
     val chat by chatAgent.chat.collectAsState()
+    var isLoading by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+
+    // Auto-scroll when new messages are added
+    LaunchedEffect(chat.size) {
+        if (chat.isNotEmpty()) {
+            listState.animateScrollToItem(chat.size - 1)
+        }
+    }
 
     MaterialTheme {
-        var userInput by remember { mutableStateOf("") }
-        var isLoading by remember { mutableStateOf(false) }
-        var selectedImage by remember { mutableStateOf<ByteArray?>(null) }
-        val coroutineScope = rememberCoroutineScope()
-        val listState = rememberLazyListState()
-
-        // Auto-scroll when new messages are added
-        LaunchedEffect(chat.size) {
-            if (chat.isNotEmpty()) {
-                listState.animateScrollToItem(chat.size - 1)
-            }
-        }
-
         Column(
             modifier = modifier
                 .background(MaterialTheme.colorScheme.background)
@@ -49,259 +48,28 @@ fun App(chatAgent: ChatAgent, modifier: Modifier = Modifier) {
         ) {
             AppHeader()
 
-            // Chat history
-            LazyColumn(
+            ChatHistoryList(
+                messages = chat,
+                isLoading = isLoading,
+                listState = listState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(horizontal = 16.dp),
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(chat) { message ->
-                    MessageBubble(message = message)
-                }
+                    .padding(horizontal = 16.dp)
+            )
 
-                if (isLoading) {
-                    item {
-                        LoadingMessageBubble()
-                    }
-                }
-            }
-
-            // Input field with image preview
-            Column(
+            ChatInputSection(
+                chatAgent = chatAgent,
+                isLoading = isLoading,
+                onLoadingChange = { isLoading = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Image preview
-                selectedImage?.let { imageBytes ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            AsyncImage(
-                                model = imageBytes,
-                                contentDescription = "Selected image preview",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 120.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Fit
-                            )
-
-                            // Remove image button
-                            IconButton(
-                                onClick = { selectedImage = null },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
-                                    .size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Remove image",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Input row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Image selection button
-                    val imagePickerLauncher = rememberImagePickerLauncher { imageBytes ->
-                        selectedImage = imageBytes
-                    }
-
-                    IconButton(
-                        onClick = { imagePickerLauncher() },
-                        enabled = !isLoading,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add image",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = userInput,
-                        onValueChange = { userInput = it },
-                        label = { Text("Enter message") },
-                        modifier = Modifier.weight(1f),
-                        enabled = !isLoading
-                    )
-
-                    Button(
-                        onClick = {
-                            if (userInput.isNotBlank() || selectedImage != null) {
-                                val message = userInput
-                                val image = selectedImage
-                                userInput = ""
-                                selectedImage = null
-                                isLoading = true
-                                coroutineScope.launch {
-                                    if (chat.isEmpty()) {
-                                        try {
-                                            if (image != null) {
-                                                // TODO: Send image message
-                                                // chatAgent.sendImageMessage(message, image)
-                                            } else {
-                                                chatAgent.runAgent(message) {
-                                                    isLoading = false
-                                                }
-                                            }
-                                        } catch (e: ApiKeyNotConfiguredException) {
-                                            // Error handling will be implemented later
-                                        } finally {
-                                            isLoading = false
-                                        }
-                                    } else {
-                                        if (image != null) {
-                                            // TODO: Send image message
-                                            // chatAgent.sendImageMessage(message, image)
-                                        } else {
-                                            chatAgent.inputResponse(message)
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        enabled = !isLoading && (userInput.isNotBlank() || selectedImage != null),
-                        modifier = Modifier.height(56.dp)
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Text("Send")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun MessageBubble(message: ChatMessage) {
-    when (message) {
-        is ChatMessage.User -> UserMessageBubble(message)
-        is ChatMessage.UserImage -> UserImageMessageBubble(message)
-        is ChatMessage.Assistant -> AssistantMessageBubble(message)
-        is ChatMessage.ToolCall -> ToolCallMessageBubble(message)
-        is ChatMessage.Structured -> StructuredMessageBubble(message)
-    }
-}
-
-@Composable
-fun UserMessageBubble(message: ChatMessage.User) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
-    ) {
-        Card(
-            modifier = Modifier.widthIn(max = 280.dp),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = 16.dp,
-                bottomEnd = 4.dp
-            ),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Text(
-                text = message.content,
-                modifier = Modifier.padding(12.dp),
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.bodyMedium
+                    .padding(16.dp)
             )
         }
     }
 }
 
-@Composable
-fun AssistantMessageBubble(message: ChatMessage.Assistant) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
-    ) {
-        Card(
-            modifier = Modifier.widthIn(max = 280.dp),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = 4.dp,
-                bottomEnd = 16.dp
-            ),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Text(
-                text = message.content,
-                modifier = Modifier.padding(12.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
-}
-
-@Composable
-fun ToolCallMessageBubble(message: ChatMessage.ToolCall) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
-    ) {
-        Card(
-            modifier = Modifier.widthIn(max = 280.dp),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Build,
-                    contentDescription = "Tool",
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = message.content,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun AppHeader() {
@@ -328,154 +96,178 @@ fun AppHeader() {
     }
 }
 
+
 @Composable
-fun UserImageMessageBubble(message: ChatMessage.UserImage) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End
+fun ChatHistoryList(
+    messages: List<ChatMessage>,
+    isLoading: Boolean,
+    listState: LazyListState,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier,
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Card(
-            modifier = Modifier.widthIn(max = 280.dp),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = 16.dp,
-                bottomEnd = 4.dp
-            ),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AsyncImage(
-                    model = message.image,
-                    contentDescription = "User uploaded image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 200.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Fit,
-                )
+        items(messages) { message ->
+            MessageBubble(message = message)
+        }
 
-                // エラー時のフォールバック表示
-                // 実際の実装では、画像の読み込み状態を監視して条件付きで表示
-
-                // Text content if provided
-                if (message.content.isNotBlank()) {
-                    Text(
-                        text = message.content,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+        if (isLoading) {
+            item {
+                LoadingMessageBubble()
             }
         }
     }
 }
 
 @Composable
-fun StructuredMessageBubble(message: ChatMessage.Structured) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
+fun ImagePreviewCard(
+    imageBytes: ByteArray,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        Card(
-            modifier = Modifier.widthIn(max = 320.dp),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = 4.dp,
-                bottomEnd = 16.dp
-            ),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+        Box(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Bird name
-                Text(
-                    text = message.content.birdName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            AsyncImage(
+                model = imageBytes,
+                contentDescription = "Selected image preview",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 120.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Fit
+            )
 
-                // Reliability score with progress bar
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "reliability",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "${message.content.reliabilityScore}%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remove image",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatInputSection(
+    chatAgent: ChatAgent,
+    isLoading: Boolean,
+    onLoadingChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var userInput by remember { mutableStateOf("") }
+    var selectedImage by remember { mutableStateOf<ByteArray?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    val chat by chatAgent.chat.collectAsState()
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Image preview
+        selectedImage?.let { imageBytes ->
+            ImagePreviewCard(
+                imageBytes = imageBytes,
+                onRemove = { selectedImage = null },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Input row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Image selection button
+            val imagePickerLauncher = rememberImagePickerLauncher { imageBytes ->
+                selectedImage = imageBytes
+            }
+
+            IconButton(
+                onClick = { imagePickerLauncher() },
+                enabled = !isLoading,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add image",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            OutlinedTextField(
+                value = userInput,
+                onValueChange = { userInput = it },
+                label = { Text("Enter message") },
+                modifier = Modifier.weight(1f),
+                enabled = !isLoading
+            )
+
+            Button(
+                onClick = {
+                    if (userInput.isNotBlank() || selectedImage != null) {
+                        val message = userInput
+                        val image = selectedImage
+                        userInput = ""
+                        selectedImage = null
+                        onLoadingChange(true)
+                        coroutineScope.launch {
+                            if (chat.isEmpty()) {
+                                try {
+                                    if (image != null) {
+                                        // TODO: Send image message
+                                        // chatAgent.sendImageMessage(message, image)
+                                    } else {
+                                        chatAgent.runAgent(message) {
+                                            onLoadingChange(false)
+                                        }
+                                    }
+                                } catch (e: ApiKeyNotConfiguredException) {
+                                    // Error handling will be implemented later
+                                } finally {
+                                    onLoadingChange(false)
+                                }
+                            } else {
+                                if (image != null) {
+                                    // TODO: Send image message
+                                    // chatAgent.sendImageMessage(message, image)
+                                } else {
+                                    chatAgent.inputResponse(message)
+                                }
+                            }
+                        }
                     }
-                    LinearProgressIndicator(
-                        progress = { message.content.reliabilityScore / 100f },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    )
-                }
-
-                // Description
-                Text(
-                    text = message.content.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun LoadingMessageBubble() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
-    ) {
-        Card(
-            modifier = Modifier.widthIn(max = 280.dp),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = 4.dp,
-                bottomEnd = 16.dp
-            ),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                },
+                enabled = !isLoading && (userInput.isNotBlank() || selectedImage != null),
+                modifier = Modifier.height(56.dp)
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
-                )
-                Text(
-                    text = "AI is generating response...",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Send")
+                }
             }
         }
     }
